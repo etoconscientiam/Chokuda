@@ -1,0 +1,13 @@
+{
+  "name": "chokuda-app",
+  "version": "1.0.0",
+  "description": "Минимальный сервер Express, отдающий статические файлы",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
