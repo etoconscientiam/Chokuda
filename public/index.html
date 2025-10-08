@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>События рядом</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        background: #f4f4f4;
+      }
+
+      .card {
+        background: #fff;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+      }
+
+      .card img {
+        max-width: 100%;
+        border-radius: 5px;
+        margin-bottom: 10px;
+      }
+
+      .card h2 {
+        margin: 0 0 5px 0;
+        font-size: 18px;
+      }
+
+      .card p {
+        margin: 0;
+        font-size: 14px;
+        color: #555;
+      }
+
+      #detail {
+        display: none;
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+      }
+
+      #back {
+        margin-top: 10px;
+        cursor: pointer;
+        color: blue;
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>События рядом</h1>
+    <div id="list"></div>
+
+    <div id="detail">
+      <h2 id="detail-title"></h2>
+      <p><strong>Дата:</strong> <span id="detail-date"></span></p>
+      <p><strong>Время:</strong> <span id="detail-time"></span></p>
+      <p><strong>Место:</strong> <span id="detail-place"></span></p>
+      <p>
+        <strong>Категория:</strong>
+        <span id="detail-category"></span>
+        /
+        <span id="detail-subcategory"></span>
+      </p>
+      <p><strong>Тэги:</strong> <span id="detail-tags"></span></p>
+      <p><strong>Цена:</strong> <span id="detail-cost"></span></p>
+      <p id="detail-desc"></p>
+      <img id="detail-img" src="" alt="" />
+      <div id="back">Назад к списку</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/tabletop@1.6.0/src/tabletop.min.js"></script>
+    <script>
+      const spreadsheetID = '1hIEkmJqEPJ2thixooVviNQL0j1qeLiA00Af8warNT3g';
+
+      function showList(data) {
+        const list = document.getElementById('list');
+        list.innerHTML = '';
+        data.forEach((event) => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.innerHTML = `
+          <img src="${event.Media}" alt="${event.Name}">
+          <h2>${event.Name}</h2>
+          <p>${event.Date} ${event.Time} — ${event.Place}</p>
+          <p>Категория: ${event.Category} / ${event.Subcategory}</p>
+        `;
+          card.onclick = () => showDetail(event);
+          list.appendChild(card);
+        });
+      }
+
+      function showDetail(event) {
+        document.getElementById('list').style.display = 'none';
+        document.getElementById('detail').style.display = 'block';
+
+        document.getElementById('detail-title').textContent = event.Name;
+        document.getElementById('detail-date').textContent = event.Date;
+        document.getElementById('detail-time').textContent = event.Time;
+        document.getElementById('detail-place').textContent = event.Place;
+        document.getElementById('detail-category').textContent = event.Category;
+        document.getElementById('detail-subcategory').textContent = event.Subcategory;
+        document.getElementById('detail-tags').textContent = event.Tags;
+        document.getElementById('detail-cost').textContent = event.cost;
+        document.getElementById('detail-desc').textContent = event.Description;
+        document.getElementById('detail-img').src = event.Media;
+      }
+
+      document.getElementById('back').onclick = () => {
+        document.getElementById('detail').style.display = 'none';
+        document.getElementById('list').style.display = 'block';
+      };
+
+      Tabletop.init({
+        key: spreadsheetID,
+        callback(data) {
+          showList(data);
+        },
+        simpleSheet: true,
+      });
+    </script>
+  </body>
+</html>
