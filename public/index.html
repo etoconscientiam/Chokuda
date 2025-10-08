@@ -332,8 +332,125 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="events.js"></script>
-</body>
+    <script>
+      const spreadsheetID = '1hIEkmJqEPJ2thixooVviNQL0j1qeLiA00Af8warNT3g';
+      const sheetURL = `https://docs.google.com/spreadsheets/d/${spreadsheetID}/gviz/tq?tqx=out:json&gid=0`;
+
+      const listElement = document.getElementById('list');
+      const detailElement = document.getElementById('detail');
+
+      function normaliseCell(cell) {
+        if (!cell) {
+          return '';
+        }
+
+        if (cell.f != null) {
+          return cell.f;
+        }
+
+        if (cell.v == null) {
+          return '';
+        }
+
+        if (typeof cell.v === 'string') {
+          const dateMatch = cell.v.match(/^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)$/);
+
+          if (dateMatch) {
+            const [year, month, day, hours = 0, minutes = 0] = dateMatch
+              .slice(1)
+              .map((value) => (value !== undefined ? Number(value) : 0));
+            const date = new Date(year, month, day, hours, minutes);
+
+            if (hours !== 0 || minutes !== 0) {
+              return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+            }
+
+            return date.toLocaleDateString('ru-RU');
+          }
+        }
+
+        return cell.v;
+      }
+
+      function parseEvents(rawText) {
+        const start = rawText.indexOf('{');
+        const end = rawText.lastIndexOf('}') + 1;
+        const json = JSON.parse(rawText.slice(start, end));
+        const columns = json.table.cols.map((column) => column.label || column.id);
+
+        return json.table.rows
+          .map(({ c: cells = [] }) => {
+            return columns.reduce((event, column, index) => {
+              event[column] = normaliseCell(cells[index]);
+              return event;
+            }, {});
+          })
+          .filter((event) => event.Name);
+      }
+
+      function renderList(events) {
+        listElement.innerHTML = '';
+
+        events.forEach((event) => {
+          const card = document.createElement('div');
+          card.className = 'card';
+
+          const imageMarkup = event.Media
+            ? `<img src="${event.Media}" alt="${event.Name}">`
+            : '';
+
+          card.innerHTML = `
+            ${imageMarkup}
+            <h2>${event.Name}</h2>
+            <p>${event.Date || ''} ${event.Time || ''} — ${event.Place || ''}</p>
+            <p>Категория: ${event.Category || '—'}${event.Subcategory ? ` / ${event.Subcategory}` : ''}</p>
+          `;
+
+          card.onclick = () => showDetail(event);
+          listElement.appendChild(card);
+        });
+      }
+
+      function showDetail(event) {
+        listElement.style.display = 'none';
+        detailElement.style.display = 'block';
+
+        document.getElementById('detail-title').textContent = event.Name || '';
+        document.getElementById('detail-date').textContent = event.Date || '';
+        document.getElementById('detail-time').textContent = event.Time || '';
+        document.getElementById('detail-place').textContent = event.Place || '';
+        document.getElementById('detail-category').textContent = event.Category || '';
+        document.getElementById('detail-subcategory').textContent = event.Subcategory || '';
+        document.getElementById('detail-tags').textContent = event.Tags || '';
+        document.getElementById('detail-cost').textContent = event.cost || '';
+        document.getElementById('detail-desc').textContent = event.Description || '';
+        document.getElementById('detail-img').src = event.Media || '';
+        document.getElementById('detail-img').alt = event.Name || '';
+      }
+
+      document.getElementById('back').onclick = () => {
+        detailElement.style.display = 'none';
+        listElement.style.display = 'block';
+      };
+
+      async function loadEvents() {
+        try {
+          const response = await fetch(sheetURL);
+
+          if (!response.ok) {
+            throw new Error('Не удалось получить данные: ' + response.statusText);
+          }
+
+          const text = await response.text();
+          const events = parseEvents(text);
+          renderList(events);
+        } catch (error) {
+          listElement.innerHTML = '<p>Не удалось загрузить события. Попробуйте обновить страницу позже.</p>';
+          console.error(error);
+        }
+      }
+
+      loadEvents();
+    </script>
+  </body>
 </html>
