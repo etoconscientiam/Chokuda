@@ -14,34 +14,10 @@ const goingEvents = loadStoredSet(goingStorageKey);
 const savedEvents = loadStoredSet(savedStorageKey);
 let toastElement = null;
 let toastTimeoutId = null;
-let storageSupport = null;
-
-function isStorageAvailable() {
-  if (storageSupport !== null) {
-    return storageSupport;
-  }
-  if (typeof window === "undefined" || typeof window.localStorage === "undefined") {
-    storageSupport = false;
-    return storageSupport;
-  }
-  try {
-    const testKey = "__storage_test__";
-    window.localStorage.setItem(testKey, testKey);
-    window.localStorage.removeItem(testKey);
-    storageSupport = true;
-  } catch (error) {
-    console.warn("Локальное хранилище недоступно", error);
-    storageSupport = false;
-  }
-  return storageSupport;
-}
 
 function loadStoredSet(storageKey) {
-  if (!isStorageAvailable()) {
-    return new Set();
-  }
   try {
-    const raw = window.localStorage.getItem(storageKey);
+    const raw = localStorage.getItem(storageKey);
     if (!raw) return new Set();
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) return new Set(parsed);
@@ -52,128 +28,11 @@ function loadStoredSet(storageKey) {
 }
 
 function persistSet(storageKey, set) {
-  if (!isStorageAvailable()) {
-    return;
-  }
   try {
-    window.localStorage.setItem(storageKey, JSON.stringify([...set]));
+    localStorage.setItem(storageKey, JSON.stringify([...set]));
   } catch (error) {
     console.warn("Не удалось сохранить данные", storageKey, error);
   }
-}
-
-async function fetchCsvText(url) {
-  const response = await fetch(url, {
-    cache: "no-store",
-    headers: { "Accept": "text/csv, text/plain;q=0.9, */*;q=0.8" }
-  });
-  if (!response.ok) {
-    throw new Error(`CSV request failed with status ${response.status}`);
-  }
-  const text = await response.text();
-  if (!text || !text.trim()) {
-    throw new Error("CSV file is empty");
-  }
-  return text;
-}
-
-function parseCsvWithPapa(text) {
-  if (typeof Papa === "undefined" || typeof Papa.parse !== "function") {
-    return null;
-  }
-  try {
-    const result = Papa.parse(text, {
-      header: true,
-      skipEmptyLines: true
-    });
-    if (Array.isArray(result.data) && result.data.length) {
-      if (result.errors && result.errors.length) {
-        console.warn("Papa Parse сообщила об ошибках", result.errors);
-      }
-      return result.data;
-    }
-  } catch (error) {
-    console.warn("Ошибка Papa Parse", error);
-  }
-  return null;
-}
-
-function splitCsvLine(line) {
-  const cells = [];
-  let current = "";
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const char = line[i];
-    if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (char === ',' && !inQuotes) {
-      cells.push(current);
-      current = "";
-    } else {
-      current += char;
-    }
-  }
-  cells.push(current);
-  return cells;
-}
-
-function parseCsvManually(text) {
-  const rows = [];
-  const normalizedText = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  const lines = normalizedText.split("\n").filter((line) => line.trim().length);
-  if (!lines.length) {
-    return rows;
-  }
-  const headers = splitCsvLine(lines[0]).map((header) => header.replace(/^"|"$/g, "").trim());
-  for (let i = 1; i < lines.length; i += 1) {
-    const values = splitCsvLine(lines[i]);
-    const record = {};
-    headers.forEach((header, index) => {
-      const rawValue = values[index] ?? "";
-      record[header] = rawValue.replace(/^"|"$/g, "").replace(/""/g, '"').trim();
-    });
-    rows.push(record);
-  }
-  return rows;
-}
-
-function normalizeEventsData(rows) {
-  if (!Array.isArray(rows)) {
-    return [];
-  }
-  return rows
-    .map((row) => {
-      if (!row) return null;
-      const normalized = {};
-      Object.keys(row).forEach((key) => {
-        const value = row[key];
-        normalized[key] = typeof value === "string" ? value.trim() : value;
-      });
-      if (!normalized.Name) {
-        return null;
-      }
-      if (!normalized.Priority) {
-        normalized.Priority = "3";
-      }
-      return normalized;
-    })
-    .filter(Boolean);
-}
-
-async function loadEventsData() {
-  const csvText = await fetchCsvText(csvUrl);
-  const parsedWithPapa = parseCsvWithPapa(csvText);
-  const rows = parsedWithPapa && parsedWithPapa.length ? parsedWithPapa : parseCsvManually(csvText);
-  const normalized = normalizeEventsData(rows);
-  if (!normalized.length) {
-    throw new Error("CSV parsed successfully but no events were found");
-  }
-  return normalized;
 }
 
 function getEventKey(event) {
@@ -429,14 +288,6 @@ function renderAll(events) {
     }
   });
 
-  if (!p1.children.length) {
-    p1.innerHTML = '<p style="margin:0;color:#666;text-align:center;">Нет событий в этом разделе.</p>';
-  }
-
-  if (!p2.children.length) {
-    p2.innerHTML = '<p style="margin:0;color:#666;text-align:center;">События для рекомендации отсутствуют.</p>';
-  }
-
   if (!p3.children.length) {
     const emptyRow = document.createElement("tr");
     emptyRow.innerHTML = '<td colspan="6" style="text-align:center;padding:24px;color:#666;">Ничего не найдено. Попробуйте изменить фильтры.</td>';
@@ -457,11 +308,6 @@ function isFreeEvent(cost) {
 }
 
 function applyFilters() {
-  if (!allEvents.length) {
-    filteredEvents = [];
-    renderAll(filteredEvents);
-    return;
-  }
   const searchTerm = filters.search.trim().toLowerCase();
   filteredEvents = allEvents.filter((event) => {
     const categoryValue = (event.Category || "").toLowerCase();
@@ -545,15 +391,8 @@ function parseCoordinatesFromText(text) {
 async function geocodeAddress(address) {
   if (!address) return null;
   const cacheKey = `geo_${address}`;
-  const storageEnabled = isStorageAvailable();
-  if (storageEnabled) {
-    try {
-      const cached = window.localStorage.getItem(cacheKey);
-      if (cached) return JSON.parse(cached);
-    } catch (error) {
-      console.warn("Не удалось прочитать кэш геокодера", error);
-    }
-  }
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) return JSON.parse(cached);
   const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
   try {
     const response = await fetch(url, { headers: { 'Accept-Language': 'ru' } });
@@ -561,13 +400,7 @@ async function geocodeAddress(address) {
     const data = await response.json();
     if (data[0]) {
       const coords = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-      if (storageEnabled) {
-        try {
-          window.localStorage.setItem(cacheKey, JSON.stringify(coords));
-        } catch (error) {
-          console.warn("Не удалось сохранить координаты в кэш", error);
-        }
-      }
+      localStorage.setItem(cacheKey, JSON.stringify(coords));
       return coords;
     }
   } catch (error) {
@@ -627,36 +460,21 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  initializeEvents();
+  Papa.parse(csvUrl, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: (results) => {
+      allEvents = (results.data || []).filter((event) => event.Name);
+      setupFilters(allEvents);
+      filteredEvents = [...allEvents];
+      renderAll(filteredEvents);
+    },
+    error: () => {
+      const tableBody = document.querySelector("#priority3 tbody");
+      if (tableBody) {
+        tableBody.innerHTML = '<tr><td colspan="6">Не удалось загрузить события. Попробуйте обновить страницу позже.</td></tr>';
+      }
+    }
+  });
 });
-
-function showLoadingError(message) {
-  const fallbackMessage = message || "Не удалось загрузить события. Попробуйте обновить страницу позже.";
-  const priorityOne = document.getElementById("priority1");
-  const priorityTwo = document.getElementById("priority2");
-  const tableBody = document.querySelector("#priority3 tbody");
-  if (priorityOne) {
-    priorityOne.innerHTML = `<p style="margin:0;color:#666;text-align:center;">${fallbackMessage}</p>`;
-  }
-  if (priorityTwo) {
-    priorityTwo.innerHTML = `<p style="margin:0;color:#666;text-align:center;">${fallbackMessage}</p>`;
-  }
-  if (tableBody) {
-    tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:#666;">${fallbackMessage}</td></tr>`;
-  }
-}
-
-async function initializeEvents() {
-  try {
-    const events = await loadEventsData();
-    allEvents = events;
-    filteredEvents = [...allEvents];
-    setupFilters(allEvents);
-    renderAll(filteredEvents);
-  } catch (error) {
-    console.error("Не удалось загрузить список событий", error);
-    allEvents = [];
-    filteredEvents = [];
-    showLoadingError();
-  }
-}
