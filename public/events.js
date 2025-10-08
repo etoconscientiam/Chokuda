@@ -8,6 +8,61 @@ const filters = {
   price: "all"
 };
 
+const goingStorageKey = "events-going";
+const savedStorageKey = "events-saved";
+const goingEvents = loadStoredSet(goingStorageKey);
+const savedEvents = loadStoredSet(savedStorageKey);
+let toastElement = null;
+let toastTimeoutId = null;
+
+function loadStoredSet(storageKey) {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return new Set(parsed);
+  } catch (error) {
+    console.warn("Не удалось прочитать сохраненные данные", storageKey, error);
+  }
+  return new Set();
+}
+
+function persistSet(storageKey, set) {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify([...set]));
+  } catch (error) {
+    console.warn("Не удалось сохранить данные", storageKey, error);
+  }
+}
+
+function getEventKey(event) {
+  const parts = [event.Name, event.Date, event.Time, event.Place, event.Category]
+    .filter(Boolean)
+    .map((value) => String(value).trim().toLowerCase());
+  if (parts.length) {
+    return parts.join("::");
+  }
+  if (typeof event.__rowNum__ !== "undefined") {
+    return `row-${event.__rowNum__}`;
+  }
+  return JSON.stringify(event);
+}
+
+function showToast(message) {
+  if (!message) return;
+  if (!toastElement) {
+    toastElement = document.createElement("div");
+    toastElement.className = "toast";
+    document.body.appendChild(toastElement);
+  }
+  toastElement.textContent = message;
+  toastElement.classList.add("show");
+  if (toastTimeoutId) clearTimeout(toastTimeoutId);
+  toastTimeoutId = setTimeout(() => {
+    toastElement.classList.remove("show");
+  }, 2200);
+}
+
 // ---------- МОДАЛКА С АНИМАЦИЕЙ + КНОПКОЙ ----------
 function openDetailCard(event) {
   const modal = document.getElementById("event-detail");
@@ -67,27 +122,146 @@ document.addEventListener("DOMContentLoaded", () => {
 function createCard(event, size = 2) {
   const card = document.createElement("div");
   card.className = "card";
-  card.onclick = () => openDetailCard(event);
+  card.addEventListener("click", () => openDetailCard(event));
   if (size === 1) {
     card.innerHTML = `
       <img src="${event.Media || "https://via.placeholder.com/600x400"}" alt="">
       <div class="overlay">
-        <h3>${event.Name}</h3>
-        <p>${event.Category || ""} • ${event.Date || ""}</p>
+        <div class="overlay-text">
+          <h3>${event.Name}</h3>
+          <p>${event.Category || ""}${event.Date ? " • " + event.Date : ""}</p>
+        </div>
+        <div class="card-actions">
+          <button type="button" data-action="going">Пойду</button>
+          <button type="button" data-action="save">Сохранить</button>
+          <button type="button" data-action="share">Поделиться</button>
+        </div>
       </div>`;
   } else {
     card.innerHTML = `
       <img src="${event.Media || "https://via.placeholder.com/300x150"}" alt="">
       <div class="info">
-        <div>
+        <div class="info-text">
           <h3>${event.Name}</h3>
           <p>${event.Category || ""}${event.Subcategory ? " / " + event.Subcategory : ""}</p>
           <p>${event.Date || ""}${event.Time ? " • " + event.Time : ""}</p>
+          <p class="info-place">${event.Place || ""}</p>
         </div>
-        <p style="font-weight:500;color:#007aff;">${event.Place || ""}</p>
+        <div class="card-actions">
+          <button type="button" data-action="going">Пойду</button>
+          <button type="button" data-action="save">Сохранить</button>
+          <button type="button" data-action="share">Поделиться</button>
+        </div>
       </div>`;
   }
+  setupCardActions(card, event);
   return card;
+}
+
+function setupCardActions(card, event) {
+  const actions = card.querySelector(".card-actions");
+  if (!actions) return;
+
+  const eventKey = getEventKey(event);
+  const goingButton = actions.querySelector('[data-action="going"]');
+  const saveButton = actions.querySelector('[data-action="save"]');
+  const shareButton = actions.querySelector('[data-action="share"]');
+
+  const updateButtons = () => {
+    if (goingButton) {
+      const isGoing = goingEvents.has(eventKey);
+      goingButton.textContent = isGoing ? "Я иду" : "Пойду";
+      goingButton.classList.toggle("is-active", isGoing);
+      goingButton.setAttribute("aria-pressed", String(isGoing));
+    }
+    if (saveButton) {
+      const isSaved = savedEvents.has(eventKey);
+      saveButton.textContent = isSaved ? "Сохранено" : "Сохранить";
+      saveButton.classList.toggle("is-active", isSaved);
+      saveButton.setAttribute("aria-pressed", String(isSaved));
+    }
+  };
+
+  if (goingButton) {
+    goingButton.addEventListener("click", (domEvent) => {
+      domEvent.stopPropagation();
+      domEvent.preventDefault();
+      if (goingEvents.has(eventKey)) {
+        goingEvents.delete(eventKey);
+        showToast("Убрано из списка «Пойду»");
+      } else {
+        goingEvents.add(eventKey);
+        showToast("Добавлено в список «Пойду»");
+      }
+      persistSet(goingStorageKey, goingEvents);
+      updateButtons();
+    });
+  }
+
+  if (saveButton) {
+    saveButton.addEventListener("click", (domEvent) => {
+      domEvent.stopPropagation();
+      domEvent.preventDefault();
+      if (savedEvents.has(eventKey)) {
+        savedEvents.delete(eventKey);
+        showToast("Событие удалено из сохранённых");
+      } else {
+        savedEvents.add(eventKey);
+        showToast("Событие сохранено");
+      }
+      persistSet(savedStorageKey, savedEvents);
+      updateButtons();
+    });
+  }
+
+  if (shareButton) {
+    shareButton.addEventListener("click", async (domEvent) => {
+      domEvent.stopPropagation();
+      domEvent.preventDefault();
+      const baseUrl = window.location.origin ? `${window.location.origin}${window.location.pathname}` : window.location.href;
+      const details = [
+        event.Name,
+        [event.Date, event.Time].filter(Boolean).join(" • "),
+        event.Place
+      ].filter(Boolean);
+      const shareText = details.join(" — ");
+      const fallbackText = `${shareText ? shareText + "\n" : ""}${baseUrl}`.trim();
+
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: event.Name || "Событие",
+            text: shareText || "Смотри какое событие!",
+            url: baseUrl
+          });
+          showToast("Событием поделились");
+          return;
+        } catch (error) {
+          if (error && error.name === "AbortError") {
+            return;
+          }
+        }
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(fallbackText);
+          showToast("Ссылка скопирована");
+        } catch (error) {
+          console.warn("Clipboard API error", error);
+          showToast("Не удалось скопировать ссылку");
+        }
+      } else {
+        window.prompt("Скопируйте ссылку на событие", fallbackText);
+      }
+    });
+  }
+
+  if (shareButton) {
+    shareButton.setAttribute("aria-label", "Поделиться событием");
+  }
+
+  updateButtons();
 }
 
 function renderAll(events) {

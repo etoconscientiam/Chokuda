@@ -115,9 +115,11 @@
     .priority-1 .card .overlay {
       position: absolute; bottom: 0; left: 0; right: 0;
       padding: 12px; background: linear-gradient(transparent, rgba(0,0,0,0.7));
+      display: flex; flex-direction: column; gap: 10px;
     }
+    .priority-1 .card .overlay-text { display: flex; flex-direction: column; gap: 4px; }
     .priority-1 .card h3 { margin: 0; font-size: 20px; font-weight: 600; }
-    .priority-1 .card p { margin: 4px 0 0; font-size: 14px; }
+    .priority-1 .card p { margin: 0; font-size: 14px; }
 
     .priority-2 .grid {
       display: flex; overflow-x: auto; scroll-snap-type: x mandatory;
@@ -137,10 +139,72 @@
     .priority-2 .card .info {
       padding: 10px 14px; display: flex; flex-direction: column;
       justify-content: space-between; height: calc(100% - 120px);
+      gap: 12px;
     }
+    .priority-2 .card .info-text { display: flex; flex-direction: column; gap: 6px; flex: 1; }
     .priority-2 .card h3 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
     .priority-2 .card p { margin: 0; font-size: 13px; color: #555; }
+    .priority-2 .card .info-place { margin-top: auto; font-weight: 600; color: #007aff; font-size: 13px; }
     .priority-2 .grid::-webkit-scrollbar { display: none; }
+
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: nowrap;
+    }
+    .card-actions button {
+      flex: 1;
+      border: none;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    .card-actions button:hover { transform: translateY(-1px); }
+    .card-actions button.is-active { background: #007aff; color: white; box-shadow: 0 6px 16px rgba(0, 122, 255, 0.35); }
+
+    .priority-1 .card-actions button {
+      background: rgba(255,255,255,0.85);
+      color: #111;
+    }
+    .priority-1 .card-actions button:hover { background: rgba(255,255,255,1); }
+    .priority-1 .card-actions button.is-active {
+      background: #ffb703;
+      color: #111;
+      box-shadow: 0 6px 16px rgba(255, 183, 3, 0.45);
+    }
+
+    .priority-2 .card-actions button {
+      background: rgba(0, 122, 255, 0.1);
+      color: #007aff;
+      border: 1px solid rgba(0, 122, 255, 0.25);
+    }
+    .priority-2 .card-actions button:hover {
+      background: rgba(0, 122, 255, 0.18);
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 32px;
+      transform: translate(-50%, 20px);
+      background: rgba(17, 17, 17, 0.9);
+      color: white;
+      padding: 12px 18px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 500;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      z-index: 50;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
 
     table {
       width: 100%; border-collapse: collapse;
