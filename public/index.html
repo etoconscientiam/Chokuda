@@ -1,77 +1,336 @@
 <!DOCTYPE html>
 <html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <title>События рядом</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        padding: 20px;
-        background: #f4f4f4;
-      }
+<head>
+  <meta charset="UTF-8">
+  <title>События рядом</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 
-      .card {
-        background: #fff;
-        padding: 15px;
-        margin-bottom: 15px;
-        border-radius: 8px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-        cursor: pointer;
-      }
+  <style>
+    body { font-family: 'Inter', sans-serif; background: #f0f3f5; margin: 0; padding: 0; color: #111; }
+    h1 { text-align: center; font-weight: 600; margin: 20px 0 10px; }
 
-      .card img {
-        max-width: 100%;
-        border-radius: 5px;
-        margin-bottom: 10px;
-      }
+    .map-btn {
+      display: block;
+      width: fit-content;
+      margin: 20px auto 40px;
+      background: #007aff;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+    .map-btn:hover { background: #005ad9; }
 
-      .card h2 {
-        margin: 0 0 5px 0;
-        font-size: 18px;
-      }
+    #map-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+      z-index: 20;
+      justify-content: center;
+      align-items: center;
+    }
+    #map-container {
+      width: 90%;
+      height: 80%;
+      max-width: 1000px;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+      position: relative;
+    }
+    #map { width: 100%; height: 100%; }
+    #close-map {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(255,255,255,0.9);
+      border: none;
+      border-radius: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-weight: 600;
+    }
 
-      .card p {
-        margin: 0;
-        font-size: 14px;
-        color: #555;
-      }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      margin: 10px 20px 30px;
+    }
+    .filters input,
+    .filters select,
+    .filters button {
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: white;
+      font-family: inherit;
+      font-size: 14px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+      cursor: pointer;
+    }
+    .filters input,
+    .filters select {
+      min-width: 180px;
+    }
+    .filters input { cursor: text; }
+    .filters input:focus,
+    .filters select:focus,
+    .filters button:hover {
+      outline: none;
+      box-shadow: 0 10px 24px rgba(0, 122, 255, 0.22);
+      transform: translateY(-1px);
+    }
+    .filters button {
+      background: #007aff;
+      color: white;
+      font-weight: 600;
+    }
 
-      #detail {
-        display: none;
-        background: #fff;
-        padding: 20px;
-        border-radius: 8px;
-      }
+    .section { padding: 0 20px 40px; }
+    .section h2 { margin: 0 0 16px; font-weight: 600; }
+    .grid { display: grid; gap: 20px; }
 
-      #back {
-        margin-top: 10px;
-        cursor: pointer;
-        color: blue;
-        text-decoration: underline;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>События рядом</h1>
-    <div id="list"></div>
+    /* --- карточки --- */
+    .priority-1 .grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .priority-1 .card {
+      position: relative; height: 220px; overflow: hidden; border-radius: 18px;
+      color: white; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      cursor: pointer; transition: transform 0.25s;
+    }
+    .priority-1 .card:hover { transform: translateY(-4px); }
+    .priority-1 .card img {
+      width: 100%; height: 180px; object-fit: cover; filter: brightness(75%);
+    }
+    .priority-1 .card .overlay {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 12px; background: linear-gradient(transparent, rgba(0,0,0,0.7));
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .priority-1 .card .overlay-text { display: flex; flex-direction: column; gap: 4px; }
+    .priority-1 .card h3 { margin: 0; font-size: 20px; font-weight: 600; }
+    .priority-1 .card p { margin: 0; font-size: 14px; }
 
-    <div id="detail">
+    .priority-2 .grid {
+      display: flex; overflow-x: auto; scroll-snap-type: x mandatory;
+      gap: 16px; padding-bottom: 10px; -webkit-overflow-scrolling: touch;
+    }
+    .priority-2 .card {
+      flex: 0 0 75%; max-width: 280px; min-width: 220px; height: 220px;
+      background: rgba(255,255,255,0.9); border-radius: 16px;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.1);
+      scroll-snap-align: start; overflow: hidden; cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .priority-2 .card:hover { transform: translateY(-4px); }
+    .priority-2 .card img {
+      width: 100%; height: 120px; object-fit: cover;
+    }
+    .priority-2 .card .info {
+      padding: 10px 14px; display: flex; flex-direction: column;
+      justify-content: space-between; height: calc(100% - 120px);
+      gap: 12px;
+    }
+    .priority-2 .card .info-text { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+    .priority-2 .card h3 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+    .priority-2 .card p { margin: 0; font-size: 13px; color: #555; }
+    .priority-2 .card .info-place { margin-top: auto; font-weight: 600; color: #007aff; font-size: 13px; }
+    .priority-2 .grid::-webkit-scrollbar { display: none; }
+
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: nowrap;
+    }
+    .card-actions button {
+      flex: 1;
+      border: none;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    .card-actions button:hover { transform: translateY(-1px); }
+    .card-actions button.is-active { background: #007aff; color: white; box-shadow: 0 6px 16px rgba(0, 122, 255, 0.35); }
+
+    .priority-1 .card-actions button {
+      background: rgba(255,255,255,0.85);
+      color: #111;
+    }
+    .priority-1 .card-actions button:hover { background: rgba(255,255,255,1); }
+    .priority-1 .card-actions button.is-active {
+      background: #ffb703;
+      color: #111;
+      box-shadow: 0 6px 16px rgba(255, 183, 3, 0.45);
+    }
+
+    .priority-2 .card-actions button {
+      background: rgba(0, 122, 255, 0.1);
+      color: #007aff;
+      border: 1px solid rgba(0, 122, 255, 0.25);
+    }
+    .priority-2 .card-actions button:hover {
+      background: rgba(0, 122, 255, 0.18);
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 32px;
+      transform: translate(-50%, 20px);
+      background: rgba(17, 17, 17, 0.9);
+      color: white;
+      padding: 12px 18px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 500;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      z-index: 50;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    table {
+      width: 100%; border-collapse: collapse;
+      background: rgba(255,255,255,0.8); backdrop-filter: blur(10px);
+      border-radius: 12px; overflow: hidden;
+    }
+    th, td {
+      padding: 10px 12px; text-align: left;
+      border-bottom: 1px solid #ddd; font-size: 14px;
+    }
+    th { background: rgba(240,240,240,0.8); font-weight: 600; }
+    tr:hover { background: rgba(240,240,240,0.5); }
+
+    /* --- модалка карточки --- */
+    #event-detail {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(8px);
+      z-index: 30;
+      justify-content: center;
+      align-items: center;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    #event-detail.show { display: flex; opacity: 1; }
+
+    #event-detail-content {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      max-width: 600px;
+      max-height: 80vh;
+      overflow-y: auto;
+      transform: translateY(40px);
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+    #event-detail.show #event-detail-content {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    #detail-img { width: 100%; border-radius: 10px; margin-bottom: 10px; }
+    #close-detail {
+      background: #007aff; color: white; border: none;
+      padding: 8px 16px; border-radius: 8px;
+      cursor: pointer; font-weight: 600; float: right;
+    }
+
+    @media (max-width: 600px) {
+      .filters { margin: 20px 16px 28px; }
+      .filters input,
+      .filters select { flex: 1 1 100%; min-width: unset; }
+      .section { padding: 0 16px 32px; }
+      .priority-1 .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <h1>События рядом</h1>
+
+  <div class="filters">
+    <input type="search" id="filter-search" placeholder="Поиск по названию или месту">
+    <select id="filter-category">
+      <option value="all">Все категории</option>
+    </select>
+    <select id="filter-price">
+      <option value="all">Любая стоимость</option>
+      <option value="free">Только бесплатные</option>
+      <option value="paid">Платные события</option>
+    </select>
+    <button id="filter-reset" type="button">Сбросить фильтры</button>
+  </div>
+
+  <div class="section priority-1">
+    <h2>Главные события</h2>
+    <div class="grid" id="priority1"></div>
+  </div>
+
+  <a href="#" class="map-btn" id="open-map">🗺️ Показать на карте</a>
+
+  <div class="section priority-2">
+    <h2>Рекомендованные</h2>
+    <div class="grid" id="priority2"></div>
+  </div>
+
+  <div class="section priority-3">
+    <h2>Все события</h2>
+    <table id="priority3">
+      <thead>
+        <tr><th>Название</th><th>Категория</th><th>Дата</th><th>Время</th><th>Место</th><th>Цена</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- модалка карты -->
+  <div id="map-modal">
+    <div id="map-container">
+      <div id="map"></div>
+      <button id="close-map">Закрыть ✕</button>
+    </div>
+  </div>
+
+  <!-- модалка карточки -->
+  <div id="event-detail">
+    <div id="event-detail-content">
+      <button id="close-detail">✕</button>
+      <img id="detail-img" src="" alt="">
       <h2 id="detail-title"></h2>
       <p><strong>Дата:</strong> <span id="detail-date"></span></p>
       <p><strong>Время:</strong> <span id="detail-time"></span></p>
       <p><strong>Место:</strong> <span id="detail-place"></span></p>
-      <p>
-        <strong>Категория:</strong>
-        <span id="detail-category"></span>
-        /
-        <span id="detail-subcategory"></span>
-      </p>
-      <p><strong>Тэги:</strong> <span id="detail-tags"></span></p>
+      <p><strong>Категория:</strong> <span id="detail-category"></span></p>
       <p><strong>Цена:</strong> <span id="detail-cost"></span></p>
+      <button id="detail-map-btn"
+        style="background:#1e90ff;color:white;border:none;padding:10px 18px;
+               border-radius:8px;cursor:pointer;font-weight:600;margin:10px 0;">
+        🗺️ Открыть на карте
+      </button>
       <p id="detail-desc"></p>
-      <img id="detail-img" src="" alt="" />
-      <div id="back">Назад к списку</div>
     </div>
+  </div>
 
     <script>
       const spreadsheetID = '1hIEkmJqEPJ2thixooVviNQL0j1qeLiA00Af8warNT3g';
